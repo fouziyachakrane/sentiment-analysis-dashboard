@@ -1,12 +1,11 @@
 # 🎬 Sentiment Analysis Pro — IMDB Reviews
 
-🇫🇷 [Lire en français](README.md)
-
 Full-stack sentiment analysis application on movie reviews (**IMDB dataset, 50,000 reviews** — combined HuggingFace train+test splits), turned from an academic mini-project (Master's in Data Science and Analytics, FP Safi — Cadi Ayyad University) into a complete product: model comparison, interactive dashboard, explainability (LIME), persistent history and REST API.
 
 ## ✨ Features
 
 - **4 models compared automatically**: Logistic Regression, Naive Bayes, Linear SVM, Random Forest — the best one (F1-score) is selected and served in production
+- **Optional DistilBERT reference row**: results from a separate Transformer fine-tuning notebook can be displayed read-only in the Models tab, without ever being served in production (see "Comparison with a Transformer model" below)
 - **Interactive dashboard**: class distribution, model performance, most frequent words (Chart.js)
 - **Real-time prediction** with confidence score
 - **Explainability (LIME)**: words that most influenced each decision, with signed weight
@@ -32,7 +31,9 @@ sentiment-analysis-pro/
 │   └── text_preprocessing.py   # Shared NLP cleaning pipeline
 ├── static/
 │   └── index.html              # Frontend (Chart.js, light theme)
-├── saved_models/                # best_model.joblib, comparison, metadata, EDA (generated)
+├── notebooks/
+│   └── transformer_comparison.ipynb  # DistilBERT fine-tuning vs TF-IDF+LogReg baseline
+├── saved_models/                # best_model.joblib, comparison, metadata, EDA, transformer_reference.json (generated)
 ├── data/                        # Optional local data
 ├── requirements.txt
 ├── Procfile                     # Render / Heroku-style deployment
@@ -80,7 +81,7 @@ App available at **http://localhost:5000**.
 | GET    | `/api/eda`               | Dataset statistics + model metrics             |
 | GET    | `/api/stats`             | User prediction statistics                     |
 | GET    | `/api/history?limit=50`  | Prediction history                             |
-| GET    | `/api/compare-models`    | Comparison table of the 4 models               |
+| GET    | `/api/compare-models`    | Comparison table of the 4 models (+ optional DistilBERT reference row) |
 
 ## 🛠️ Tech stack
 
@@ -100,13 +101,16 @@ The best model is automatically selected on F1-score; exact metrics (accuracy, p
 
 **Streamlit Cloud**: requires porting the frontend to Streamlit (not included here; the Flask API + `services/` can be reused as-is as the business logic layer).
 
+## 🔬 Comparison with a Transformer model
+
+`notebooks/transformer_comparison.ipynb` fine-tunes `distilbert-base-uncased` on the same dataset (same 80/20 split and test set) and compares accuracy, F1-score, training time and inference time with the TF-IDF + Logistic Regression baseline used in production. Goal: document the performance/cost trade-off between classic ML and Deep Learning, not to replace the production pipeline.
+
 ## 🔭 Roadmap
 
-- Deep Learning architectures (LSTM/Transformers) as a replacement for TF-IDF
 - Adaptation to Moroccan dialect (Darija)
 - Authentication for per-user history
 
-## 👥 Authors
+## 👥 Author
 
-Ihssane LABIBI · Fouziya CHAKRANE · Maroua LANDAOUI · Imane ELAICHI
+Fouziya CHAKRANE
 Master's in Data Science and Analytics — Polydisciplinary Faculty of Safi, Cadi Ayyad University (2025/2026)
