@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Modèles entraînés et données volumineuses (regénérés par train_models.py)
+saved_models/*.joblib
+saved_models/*.json
+database/*.db
+data/*.csv
+
+# Environnement
+.env
+
+# OS / éditeurs
+.DS_Store
+.vscode/
+.idea/

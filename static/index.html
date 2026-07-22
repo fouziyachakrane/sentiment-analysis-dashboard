@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMDB Sentiment Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f3ff;
+  --surface: #ffffff;
+  --surface2: #ede9fe;
+  --border: rgba(139,92,246,0.15);
+  --border2: rgba(139,92,246,0.3);
+  --text: #2e1065;
+  --muted: rgba(124,58,237,0.55);
+  --accent: #7c3aed;
+  --accent2: #a855f7;
+  --green: #059669;
+  --amber: #d97706;
+  --font-head: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* NAV */
+nav {
+  height: 64px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
+}
+.logo {
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+}
+.logo-badge {
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+}
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 4px;
+}
+.nav-tab {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 7px 20px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.18s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-tab.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 4px rgba(124,58,237,0.15);
+}
+.nav-tab:hover:not(.active) { color: var(--accent); background: rgba(124,58,237,0.06); }
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 5px 14px;
+  border-radius: 100px;
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(5,150,105,0.4);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+/* PAGES */
+.page { display: none; flex: 1; padding: 2rem; animation: fadeIn 0.22s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+
+.page-title {
+  font-family: var(--font-head);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+.page-sub { font-size: 0.73rem; color: var(--muted); margin-bottom: 1.75rem; }
+
+/* METRICS */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.metric-card:hover { border-color: var(--border2); box-shadow: 0 4px 16px rgba(124,58,237,0.08); }
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--mc, var(--accent));
+  border-radius: 12px 12px 0 0;
+}
+.metric-label { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+.metric-value { font-family: var(--font-head); font-size: 1.9rem; font-weight: 800; line-height: 1; }
+.metric-sub { font-size: 0.68rem; color: var(--muted); margin-top: 5px; }
+
+/* GRIDS */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+@media(max-width:860px){ .grid-2{grid-template-columns:1fr} }
+
+/* PANEL */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; transition: box-shadow 0.2s; overflow: hidden; }
+.panel:hover { box-shadow: 0 4px 20px rgba(124,58,237,0.07); }
+.panel-title {
+  font-family: var(--font-head);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-title .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dc, var(--accent)); flex-shrink: 0; }
+.chart-wrap { position: relative; width: 100%; }
+
+/* TABS */
+.tab-btns { display: flex; gap: 6px; margin-bottom: 1.25rem; }
+.tab-btn {
+  font-size: 0.7rem; padding: 5px 16px; border-radius: 6px;
+  background: var(--surface2); color: var(--muted);
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all 0.15s; font-family: var(--font-mono);
+}
+.tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* PREDICT LAYOUT */
+.predict-layout { display: grid; grid-template-columns: 1fr 380px; gap: 1.25rem; align-items: start; }
+@media(max-width:960px){ .predict-layout{grid-template-columns:1fr} }
+
+.input-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; }
+.input-title { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+.model-tag { font-family: var(--font-mono); font-size: 0.6rem; background: var(--surface2); border: 1px solid var(--border); padding: 3px 10px; border-radius: 4px; color: var(--muted); letter-spacing: 0.06em; }
+.input-sub { font-size: 0.72rem; color: var(--muted); margin-bottom: 1rem; }
+
+textarea {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: var(--font-mono);
+  font-size: 0.85rem; padding: 1rem; resize: vertical; min-height: 130px;
+  outline: none; transition: border-color 0.2s; line-height: 1.6;
+}
+textarea:focus { border-color: var(--accent); }
+textarea::placeholder { color: var(--muted); }
+
+.predict-actions { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; align-items: center; }
+.hint { font-size: 0.65rem; color: var(--muted); margin-left: auto; }
+
+button { font-family: var(--font-mono); font-size: 0.78rem; cursor: pointer; border-radius: 8px; border: none; padding: 0.65rem 1.25rem; transition: all 0.15s; }
+.btn-primary { background: var(--accent); color: #fff; font-weight: 500; display:flex; align-items:center; gap:6px; }
+.btn-primary:hover { background: #6a2fd0; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+.btn-secondary:hover { color: var(--text); border-color: var(--border2); }
+
+/* RESULT CARD */
+.result-card { margin-top: 1.5rem; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; display: none; }
+.result-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
+.sentiment-badge { font-family: var(--font-head); font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+.conf-section { padding: 1rem 1.5rem; background: var(--surface2); }
+.conf-label { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; }
+.conf-bar-bg { height: 8px; background: rgba(124,58,237,0.1); border-radius: 4px; overflow: hidden; }
+.conf-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+.cleaned-section { padding: 1rem 1.5rem; font-size: 0.75rem; color: var(--muted); line-height: 1.7; border-top: 1px solid var(--border); }
+.cleaned-section .clabel { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; display: block; }
+.cleaned-words { color: var(--text); opacity: 0.8; }
+
+/* HISTORY */
+.history-list { display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow-y: auto; padding-right: 2px; }
+.history-list::-webkit-scrollbar { width: 3px; }
+.history-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.history-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: var(--surface2); border-radius: 8px; font-size: 0.73rem; border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
+.history-item:hover { border-color: var(--border2); }
+.hi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+.hi-body { flex: 1; min-width: 0; }
+.hi-text { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.hi-meta { display: flex; align-items: center; gap: 8px; }
+.hi-sentiment { font-size: 0.62rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
+.hi-conf { font-size: 0.62rem; color: var(--muted); }
+.empty-history { color: var(--muted); font-size: 0.75rem; text-align: center; padding: 3rem 0; opacity: 0.7; line-height: 1.8; }
+.hist-count { margin-left: auto; font-size: 0.65rem; background: var(--surface2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 20px; color: var(--muted); }
+
+/* LOADING */
+.loading-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem; z-index: 100; }
+.spinner { width: 36px; height: 36px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.75s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-text { font-family: var(--font-head); font-size: 0.85rem; color: var(--muted); letter-spacing: 0.08em; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Chargement du modèle...</div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">
+    Sentiment Dashboard
+    <span class="logo-badge">IMDB</span>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="tab-eda" onclick="goPage('eda')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="1" y="8" width="3" height="7" rx="1"/><rect x="6" y="5" width="3" height="10" rx="1"/><rect x="11" y="2" width="3" height="13" rx="1"/>
+      </svg>
+      Analyse EDA
+    </button>
+    <button class="nav-tab" id="tab-predict" onclick="goPage('predict')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="8" r="6.5"/><path d="M5.5 8.5l2 2 3-4"/>
+      </svg>
+      Prédiction
+    </button>
+    <button class="nav-tab" id="tab-models" onclick="goPage('models')">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M2 3h12M2 8h12M2 13h12"/>
+      </svg>
+      Modèles
+    </button>
+  </div>
+
+  <div class="status-pill">
+    <div class="status-dot"></div>
+    <span id="statusLabel">Connexion...</span>
+  </div>
+</nav>
+
+<!-- PAGE 1 : EDA -->
+<div class="page active" id="page-eda">
+  <div class="page-title">Analyse exploratoire</div>
+  <div class="page-sub" id="edaSub">Dataset IMDB · chargement du modèle...</div>
+
+  <div class="metrics-row">
+    <div class="metric-card" style="--mc:#7c3aed">
+      <div class="metric-label">Total avis</div>
+      <div class="metric-value" id="m-total">—</div>
+      <div class="metric-sub">échantillon</div>
+    </div>
+    <div class="metric-card" style="--mc:#059669">
+      <div class="metric-label">Accuracy</div>
+      <div class="metric-value" id="m-acc">—</div>
+      <div class="metric-sub">jeu de test</div>
+    </div>
+    <div class="metric-card" style="--mc:#a855f7">
+      <div class="metric-label">Mots moyens</div>
+      <div class="metric-value" id="m-words">—</div>
+      <div class="metric-sub">après nettoyage</div>
+    </div>
+    <div class="metric-card" style="--mc:#d97706">
+      <div class="metric-label">Précision pos.</div>
+      <div class="metric-value" id="m-prec">—</div>
+      <div class="metric-sub">LinearSVC</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-title"><div class="dot"></div>Distribution des sentiments</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="chartDistribution"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="--dc:#059669"></div>Performance du modèle</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chartPerformance"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><div class="dot" style="--dc:#d97706"></div>Mots les plus fréquents</div>
+    <div class="tab-btns">
+      <button class="tab-btn active" onclick="switchTab('all', this)">Tous</button>
+      <button class="tab-btn" onclick="switchTab('positive', this)">Positifs</button>
+      <button class="tab-btn" onclick="switchTab('negative', this)">Négatifs</button>
+    </div>
+    <div class="chart-wrap" id="wordChartWrap" style="height:340px"><canvas id="chartWords"></canvas></div>
+  </div>
+</div>
+
+<!-- PAGE 2 : PREDICTION -->
+<div class="page" id="page-predict">
+  <div class="page-title">Prédiction en direct</div>
+  <div class="page-sub">Analysez le sentiment d'un avis de film instantanément · <kbd style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:0.7rem">Ctrl+Entrée</kbd> pour analyser</div>
+
+  <div class="predict-layout">
+    <div>
+      <div class="input-panel">
+        <div class="input-title">
+          Votre critique
+          <span class="model-tag" id="modelTag">TF-IDF</span>
+        </div>
+        <div class="input-sub">Entrez un avis de film en anglais</div>
+
+        <textarea id="reviewInput" placeholder="Ex: This movie was absolutely incredible, one of the best films I have seen in years. The performances were outstanding and the story was deeply moving."></textarea>
+
+        <div class="predict-actions">
+          <button class="btn-primary" id="analyzeBtn" onclick="predict()">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6.5"/><path d="M5.5 8.5l2 2 3-4"/></svg>
+            Analyser
+          </button>
+          <button class="btn-secondary" onclick="loadSample()">Exemple aléatoire</button>
+          <button class="btn-secondary" onclick="clearInput()">Effacer</button>
+          <span class="hint">Ctrl+Entrée</span>
+        </div>
+
+        <div class="result-card" id="resultCard">
+          <div class="result-header" id="resultHeader">
+            <div class="sentiment-badge" id="sentimentBadge">—</div>
+            <div style="font-size:0.72rem;color:var(--muted)" id="confText">—</div>
+          </div>
+          <div class="conf-section">
+            <div class="conf-label">
+              <span>Confiance du modèle</span>
+              <span id="confPct">—</span>
+            </div>
+            <div class="conf-bar-bg">
+              <div class="conf-bar-fill" id="confBar" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="cleaned-section">
+            <span class="clabel">Texte nettoyé</span>
+            <span class="cleaned-words" id="cleanedWords">—</span>
+          </div>
+          <div class="cleaned-section" id="explainSection" style="display:none">
+            <span class="clabel">Mots les plus influents</span>
+            <div id="explainWords" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">
+        <div class="dot" style="--dc:#a855f7"></div>
+        Historique
+        <span class="hist-count" id="histCount">0 avis</span>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="empty-history">Aucune prédiction encore<br>Analysez un avis pour commencer</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 3 : COMPARATIF DES MODÈLES -->
+<div class="page" id="page-models">
+  <div class="page-title">Comparaison des modèles</div>
+  <div class="page-sub">Logistic Regression · Naive Bayes · Linear SVM · Random Forest — le meilleur est sélectionné automatiquement (F1-score)</div>
+
+  <div class="panel">
+    <div class="panel-title"><div class="dot" style="--dc:#7c3aed"></div>Tableau comparatif</div>
+    <div style="overflow-x:auto">
+      <table id="modelsTable" style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:0.8rem">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:10px 8px;color:var(--muted)">Modèle</th>
+            <th style="text-align:right;padding:10px 8px;color:var(--muted)">Accuracy</th>
+            <th style="text-align:right;padding:10px 8px;color:var(--muted)">Precision</th>
+            <th style="text-align:right;padding:10px 8px;color:var(--muted)">Recall</th>
+            <th style="text-align:right;padding:10px 8px;color:var(--muted)">F1-score</th>
+            <th style="text-align:right;padding:10px 8px;color:var(--muted)">Temps</th>
+          </tr>
+        </thead>
+        <tbody id="modelsTableBody">
+          <tr><td colspan="6" style="padding:16px;color:var(--muted)">Chargement...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="modelsTableNote" style="display:none;margin-top:10px;font-size:0.75rem;color:var(--muted)">
+      * DistilBERT évalué séparément dans <code>notebooks/transformer_comparison.ipynb</code> sur un sous-échantillon, non entraîné ni servi par l'application — affiché à titre de référence uniquement.
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:5000/api';
+let edaData = null;
+let wordChartInstance = null;
+let histCount = 0;
+
+function goPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+  if (id === 'eda' && wordChartInstance) setTimeout(() => wordChartInstance.resize(), 50);
+  if (id === 'models') loadModelsComparison();
+}
+
+function loadModelsComparison() {
+  fetch(`${API}/compare-models`)
+    .then(r => r.json())
+    .then(data => {
+      const body = document.getElementById('modelsTableBody');
+      body.innerHTML = '';
+      let hasReference = false;
+      data.models.forEach(m => {
+        const isBest = m.model === data.best_model;
+        const isReference = !!m.reference_only;
+        if (isReference) hasReference = true;
+        const row = document.createElement('tr');
+        row.style.cssText = `border-bottom:1px solid var(--border);${isBest ? 'background:rgba(124,58,237,0.06)' : ''}${isReference ? 'opacity:0.75;font-style:italic' : ''}`;
+        const badge = isBest
+          ? ' <span style="font-size:0.65rem;background:var(--accent);color:#fff;padding:2px 6px;border-radius:4px;margin-left:6px">MEILLEUR</span>'
+          : isReference
+            ? ' <span style="font-size:0.65rem;background:var(--muted);color:#fff;padding:2px 6px;border-radius:4px;margin-left:6px">RÉFÉRENCE*</span>'
+            : '';
+        row.innerHTML = `
+          <td style="padding:10px 8px;font-weight:${isBest ? 700 : 400};color:${isBest ? 'var(--accent)' : 'var(--text)'}">
+            ${m.model}${badge}
+          </td>
+          <td style="text-align:right;padding:10px 8px">${m.accuracy}%</td>
+          <td style="text-align:right;padding:10px 8px">${m.precision}%</td>
+          <td style="text-align:right;padding:10px 8px">${m.recall}%</td>
+          <td style="text-align:right;padding:10px 8px">${m.f1_score}%</td>
+          <td style="text-align:right;padding:10px 8px;color:var(--muted)">${m.training_time_sec}s</td>`;
+        body.appendChild(row);
+      });
+      const note = document.getElementById('modelsTableNote');
+      if (note) note.style.display = hasReference ? 'block' : 'none';
+    })
+    .catch(() => {
+      document.getElementById('modelsTableBody').innerHTML =
+        '<tr><td colspan="6" style="padding:16px;color:var(--muted)">Comparatif indisponible — entraînez le modèle (python -m models.train_models)</td></tr>';
+    });
+}
+
+function initDistributionChart(data) {
+  const ctx = document.getElementById('chartDistribution').getContext('2d');
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Positif', 'Négatif'],
+      datasets: [{
+        data: [data.sentiment_counts.positive || 0, data.sentiment_counts.negative || 0],
+        backgroundColor: ['rgba(5,150,105,0.15)', 'rgba(168,85,247,0.18)'],
+        borderColor: ['#059669', '#a855f7'],
+        borderWidth: 2,
+        hoverBackgroundColor: ['rgba(5,150,105,0.25)', 'rgba(168,85,247,0.28)'],
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '70%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} avis` } } }
+    }
+  });
+  const pos = data.sentiment_counts.positive || 0;
+  const neg = data.sentiment_counts.negative || 0;
+  const total = pos + neg;
+  const wrapper = document.getElementById('chartDistribution').parentNode;
+  const legend = document.createElement('div');
+  legend.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px 16px;justify-content:center;margin-top:14px;font-size:12px;padding-bottom:4px;';
+  legend.innerHTML = `
+    <span style="display:flex;align-items:center;gap:6px">
+      <span style="width:10px;height:10px;border-radius:2px;background:#059669;display:inline-block"></span>
+      <span style="color:rgba(124,58,237,0.5)">Positif</span>
+      <strong style="color:#2e1065">${((pos/total)*100).toFixed(1)}%</strong>
+    </span>
+    <span style="display:flex;align-items:center;gap:6px">
+      <span style="width:10px;height:10px;border-radius:2px;background:#a855f7;display:inline-block"></span>
+      <span style="color:rgba(124,58,237,0.5)">Négatif</span>
+      <strong style="color:#2e1065">${((neg/total)*100).toFixed(1)}%</strong>
+    </span>`;
+  wrapper.appendChild(legend);
+}
+
+function initPerformanceChart(data) {
+  const ctx = document.getElementById('chartPerformance').getContext('2d');
+  new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: ['Précision pos.', 'Rappel pos.', 'Précision nég.', 'Rappel nég.', 'Accuracy'],
+      datasets: [{
+        data: [data.precision_positive, data.recall_positive, data.precision_negative, data.recall_negative, data.model_accuracy],
+        backgroundColor: 'rgba(124,58,237,0.1)', borderColor: '#7c3aed', borderWidth: 2,
+        pointBackgroundColor: '#7c3aed', pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { r: {
+        min: 70, max: 100,
+        ticks: { color: 'rgba(124,58,237,0.5)', font: { size: 10 }, stepSize: 10, backdropColor: 'transparent' },
+        grid: { color: 'rgba(124,58,237,0.1)' },
+        angleLines: { color: 'rgba(124,58,237,0.1)' },
+        pointLabels: { color: '#5b21b6', font: { size: 10 } }
+      }},
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+function buildWordChart(words) {
+  const wrap = document.getElementById('wordChartWrap');
+  wrap.style.height = Math.max(300, words.length * 30 + 60) + 'px';
+  const labels = words.map(w => w.word);
+  const values = words.map(w => w.count);
+  const maxVal = Math.max(...values);
+  const colors = values.map(v => `rgba(124,58,237,${(0.35 + (v/maxVal) * 0.55).toFixed(2)})`);
+  if (wordChartInstance) wordChartInstance.destroy();
+  const ctx = document.getElementById('chartWords').getContext('2d');
+  wordChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, borderSkipped: false }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw} occurrences` } } },
+      scales: {
+        x: { grid: { color: 'rgba(124,58,237,0.07)' }, ticks: { color: 'rgba(124,58,237,0.5)', font: { size: 11 } } },
+        y: { grid: { display: false }, ticks: { color: '#2e1065', font: { size: 11, family: 'DM Mono' } } }
+      }
+    }
+  });
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (!edaData) return;
+  if (tab === 'all') buildWordChart(edaData.top20_words.slice(0, 15));
+  else if (tab === 'positive') buildWordChart(edaData.top10_positive);
+  else buildWordChart(edaData.top10_negative);
+}
+
+async function predict() {
+  const text = document.getElementById('reviewInput').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('analyzeBtn');
+  btn.textContent = 'Analyse...';
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`${API}/predict`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+    const data = await resp.json();
+    if (data.error) { alert(data.error); return; }
+    showResult(data);
+    addHistory(data);
+    loadStats();
+    // Appel séparé pour l'explicabilité (LIME) — n'écrase pas l'historique
+    fetch(`${API}/explain`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
+      .then(r => r.json())
+      .then(exp => { if (!exp.error) showExplanation(exp.explanation); })
+      .catch(() => {});
+  } catch(e) {
+    alert('Erreur de connexion. Assurez-vous que app.py tourne sur le port 5000.');
+  } finally {
+    btn.textContent = 'Analyser';
+    btn.disabled = false;
+  }
+}
+
+function showResult(data) {
+  const isPos = data.prediction === 'Positive';
+  const color = isPos ? '#059669' : '#a855f7';
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('sentimentBadge').innerHTML = `<span style="color:${color}">${isPos ? '▲' : '▼'}</span> ${isPos ? 'POSITIF' : 'NÉGATIF'}`;
+  document.getElementById('resultHeader').style.background = isPos ? 'rgba(5,150,105,0.04)' : 'rgba(168,85,247,0.05)';
+  document.getElementById('resultHeader').style.borderBottom = `1px solid ${color}33`;
+  document.getElementById('confText').textContent = `${data.confidence}% de confiance`;
+  document.getElementById('confBar').style.width = data.confidence + '%';
+  document.getElementById('confBar').style.background = color;
+  document.getElementById('confPct').textContent = data.confidence + '%';
+  document.getElementById('cleanedWords').textContent = data.cleaned_text;
+  document.getElementById('explainSection').style.display = 'none';
+  document.getElementById('explainWords').innerHTML = '';
+}
+
+function showExplanation(words) {
+  if (!words || !words.length) return;
+  const box = document.getElementById('explainWords');
+  box.innerHTML = '';
+  words.forEach(w => {
+    const isPos = w.weight >= 0;
+    const chip = document.createElement('span');
+    chip.style.cssText = `font-size:0.72rem;padding:3px 9px;border-radius:20px;font-family:var(--font-mono);
+      background:${isPos ? 'rgba(5,150,105,0.1)' : 'rgba(168,85,247,0.1)'};
+      color:${isPos ? '#059669' : '#a855f7'};border:1px solid ${isPos ? '#05966933' : '#a855f733'}`;
+    chip.textContent = `${w.word} ${isPos ? '+' : ''}${w.weight}`;
+    box.appendChild(chip);
+  });
+  document.getElementById('explainSection').style.display = 'block';
+}
+
+function addHistory(data) {
+  histCount++;
+  document.getElementById('histCount').textContent = histCount + ' avis';
+  const list = document.getElementById('historyList');
+  if (list.querySelector('.empty-history')) list.innerHTML = '';
+  const isPos = data.prediction === 'Positive';
+  const color = isPos ? '#059669' : '#a855f7';
+  const item = document.createElement('div');
+  item.className = 'history-item';
+  item.innerHTML = `
+    <div class="hi-dot" style="background:${color}"></div>
+    <div class="hi-body">
+      <div class="hi-text" title="${data.original_text}">${data.original_text}</div>
+      <div class="hi-meta">
+        <span class="hi-sentiment" style="color:${color}">${isPos ? 'Positif' : 'Négatif'}</span>
+        <span class="hi-conf">${data.confidence}% confiance</span>
+      </div>
+    </div>`;
+  item.onclick = () => { document.getElementById('reviewInput').value = data.original_text; showResult(data); };
+  list.prepend(item);
+}
+
+async function loadStats() {
+  try {
+    const resp = await fetch(`${API}/stats`);
+    const stats = await resp.json();
+    if (stats.total_predictions) {
+      document.getElementById('statusLabel').textContent =
+        `${stats.total_predictions} prédiction(s) · ${stats.positive_pct}% positif`;
+    }
+  } catch(e) { /* silencieux */ }
+}
+
+async function loadHistoryFromBackend() {
+  try {
+    const resp = await fetch(`${API}/history?limit=20`);
+    const items = await resp.json();
+    if (!items.length) return;
+    items.reverse().forEach(h => addHistory({
+      original_text: h.text,
+      prediction: h.prediction.charAt(0).toUpperCase() + h.prediction.slice(1),
+      confidence: h.confidence,
+    }));
+  } catch(e) { /* silencieux */ }
+}
+
+const SAMPLE_REVIEWS = [
+  "This film was absolutely spectacular, one of the best movies I've seen in years! The acting was superb.",
+  "A complete waste of time. The plot made no sense and the acting was terrible throughout.",
+  "Beautifully shot with an emotional story that stayed with me long after the credits rolled.",
+  "Boring, predictable and way too long. I almost fell asleep halfway through.",
+  "The performances were outstanding and the direction was masterful. Highly recommended!",
+  "Awful dialogue, weak characters, and a rushed ending. I regret watching this.",
+];
+
+function loadSample() {
+  document.getElementById('reviewInput').value = SAMPLE_REVIEWS[Math.floor(Math.random() * SAMPLE_REVIEWS.length)];
+}
+
+function clearInput() {
+  document.getElementById('reviewInput').value = '';
+  document.getElementById('resultCard').style.display = 'none';
+}
+
+document.getElementById('reviewInput').addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) predict(); });
+
+async function loadEDA() {
+  try {
+    const resp = await fetch(`${API}/eda`);
+    edaData = await resp.json();
+    if (edaData.error) throw new Error(edaData.error);
+
+    document.getElementById('m-total').textContent = edaData.total_samples.toLocaleString();
+    document.getElementById('m-acc').textContent = edaData.model_accuracy + '%';
+    document.getElementById('m-words').textContent = edaData.avg_words;
+    document.getElementById('m-prec').textContent = edaData.precision_positive + '%';
+    document.getElementById('edaSub').textContent = `Dataset IMDB · ${edaData.total_samples.toLocaleString()} avis · ${edaData.best_model_name} + TF-IDF`;
+    document.getElementById('modelTag').textContent = `${edaData.best_model_name} · TF-IDF`;
+    document.getElementById('statusLabel').textContent = 'Modèle prêt · ' + edaData.best_model_name;
+
+    initDistributionChart(edaData);
+    initPerformanceChart(edaData);
+    buildWordChart(edaData.top20_words.slice(0, 15));
+    document.getElementById('loadingOverlay').style.display = 'none';
+
+    loadStats();
+    loadHistoryFromBackend();
+  } catch(e) {
+    document.getElementById('loadingOverlay').innerHTML = `
+      <div style="font-family:'Syne',sans-serif;color:#7c3aed;font-size:1rem;font-weight:700">Serveur non disponible ou modèle non entraîné</div>
+      <div style="color:rgba(124,58,237,0.6);font-size:0.8rem;text-align:center;max-width:360px;line-height:1.8">
+        Lancez <code style="background:#ede9fe;padding:2px 10px;border-radius:4px;color:#5b21b6">python -m models.train_models</code>
+        puis <code style="background:#ede9fe;padding:2px 10px;border-radius:4px;color:#5b21b6">python app.py</code><br>
+        et rechargez cette page.
+      </div>`;
+  }
+}
+
+loadEDA();
+</script>
+</body>
+</html>
